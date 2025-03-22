@@ -2,6 +2,13 @@
 name = "filesan"
 version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0"
+description = "Uniquely escape disallowed filenames."
+homepage = "https://github.com/BonnyAD9/filesan"
+repository = "https://github.com/BonnyAD9/filesan"
+readme = "README.md"
+keywords = ["sanitize-filename", "filename", "sanitize"]
+categories = ["encoding", "filesystem"]
 
 [dependencies]
 bitflags = "2.9.0"

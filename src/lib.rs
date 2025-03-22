@@ -8,23 +8,46 @@
 //! Given a filename, escape the filename so that it is allowed by the OS.
 //!
 //! The main function of this crate is [`escape_str`] which will take string
-//! as input, and return modified version that can be used as filename.
+//! as input, and return modified version that can be used as filename:
+//! ```
+//! use filesan::{escape_str, Mode};
+//!
+//! // Unix support
+//! assert_eq!(
+//!     escape_str("\x00hello/the_re.txt:.", '_', Mode::UNIX),
+//!     "_00hello_2Fthe_5Fre.txt:."
+//! );
+//!
+//! // Windows support
+//! assert_eq!(
+//!     escape_str("\x00hello/the_re.txt:.", '_', Mode::WINDOWS),
+//!     "_00hello_2Fthe_5Fre.txt_3A_2E"
+//! );
+//!
+//! // MACOS support
+//! assert_eq!(
+//!     escape_str("\x00hello/the_re.txt:.", '_', Mode::MAC),
+//!     "_00hello_2Fthe_5Fre.txt_3A."
+//! );
+//! ```
+//!
+//! You can use [`Mode::SYSTEM`] to get your current target system. See
+//! documentation of [`escape_str`] for more info.
 
 mod char_flags;
 
 pub use self::char_flags::*;
 
-const NON: CharFlags = CharFlags::NONE;
-const WWW: CharFlags = CharFlags::WINDOWS;
-const WWM: CharFlags = CharFlags::from_bits_retain(
-    CharFlags::WINDOWS.bits() | CharFlags::MAC.bits(),
+const NON: Mode = Mode::NONE;
+const WWW: Mode = Mode::WINDOWS;
+const WWM: Mode =
+    Mode::from_bits_retain(Mode::WINDOWS.bits() | Mode::MAC.bits());
+const UWM: Mode = Mode::from_bits_retain(
+    Mode::UNIX.bits() | Mode::WINDOWS.bits() | Mode::MAC.bits(),
 );
-const UWM: CharFlags = CharFlags::from_bits_retain(
-    CharFlags::UNIX.bits() | CharFlags::WINDOWS.bits() | CharFlags::MAC.bits(),
-);
-const WEE: CharFlags = CharFlags::WINDOWS_END;
+const WEE: Mode = Mode::WINDOWS_END;
 
-const DISALLOWED_CHARS: &[CharFlags] = &[
+const DISALLOWED_CHARS: &[Mode] = &[
     // NUL SOH STX ETX  EOT  ENQ  ACK  BEL  BS   TAB  LF   VT   FF   CR   SO
     UWM, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW, WWW,
     // SI DLE DC1  DC2  DC3  DC4  NAK  SYN  ETB  CAN  EM   SUB  ESC  FS   GS
@@ -66,7 +89,16 @@ pub const SYSTEM_RESERVED: &[&str] = WINDOWS_RESERVED;
 pub const SYSTEM_RESERVED: &[&str] = UNIX_RESERVED;
 
 /// Checks if the given char is allowed in path on the given systems.
-pub fn allowed(c: char, mode: CharFlags) -> bool {
+///
+/// Disallowed characters by mode:
+/// - [`Mode::UNIX`]: `\x00`, `/`
+/// - [`Mode::WINDOWS`]: `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`,
+///   `|`, `?`, `*`
+/// - [`Mode::MAC`]: `\x00`, `/`, `:`
+/// - [`Mode::ALL`]: all of the above.
+/// - [`Mode::SYSTEM`]: flag of the current target system.
+/// - [`Mode::WINDOWS_END`]: ` `, `.`
+pub fn allowed(c: char, mode: Mode) -> bool {
     let n = c as u32 as usize;
     if n >= DISALLOWED_CHARS.len() {
         true
@@ -86,31 +118,54 @@ pub fn allowed(c: char, mode: CharFlags) -> bool {
 ///
 /// `mode` may be any combination of the following flags that combine features
 /// of disallowed filename features that will be escaped:
-/// - [`CharFlags::UNIX`]:
+/// - [`Mode::UNIX`]:
 ///     - disallowed characters: `\x00`, `/`
 ///     - disallowed filenames: `.`, `..`
-/// - [`CharFlags::WINDOWS`]:
+/// - [`Mode::WINDOWS`]:
 ///     - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`,
-///       `|`, `?`, `*`.
+///       `|`, `?`, `*`
 ///     - disallowed filenames (both with and without extension): `CON`, `PRN`,
 ///       `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
 ///     - disallowed characters at the end: ` `, `.`
-/// - [`CharFlags::MAC`]:
+/// - [`Mode::MAC`]:
 ///     - disallowed characters: `\x00`, `/`, `:`
 ///     - disallowed filenames: `.`, `..`
-/// - [`CharFlags::ALL`]: all of the above.
-/// - [`CharFlags::SYSTEM`]: flag of the current target system.
-/// - [`CharFlags::WINDOWS_END`]:
+/// - [`Mode::ALL`]: all of the above.
+/// - [`Mode::SYSTEM`]: flag of the current target system.
+/// - [`Mode::WINDOWS_END`]:
 ///     - disallowed characters: ` `, `.`
 ///
 /// # Returns
 /// String with escaped invalid paths. Escape character and invalid characters
 /// are replaced with escape character followed by two digit hex value of the
 /// character. Invalid filenames are prefixed with the escape character.
-pub fn escape_str(mut p: &str, esc: char, mode: CharFlags) -> String {
+///
+/// # Example
+/// ```
+/// use filesan::{escape_str, Mode};
+///
+/// // Unix support
+/// assert_eq!(
+///     escape_str("\x00hello/the_re.txt:.", '_', Mode::UNIX),
+///     "_00hello_2Fthe_5Fre.txt:."
+/// );
+///
+/// // Windows support
+/// assert_eq!(
+///     escape_str("\x00hello/the_re.txt:.", '_', Mode::WINDOWS),
+///     "_00hello_2Fthe_5Fre.txt_3A_2E"
+/// );
+///
+/// // MACOS support
+/// assert_eq!(
+///     escape_str("\x00hello/the_re.txt:.", '_', Mode::MAC),
+///     "_00hello_2Fthe_5Fre.txt_3A."
+/// );
+/// ```
+pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
     let mut res = String::new();
 
-    if mode.contains(CharFlags::WINDOWS) {
+    if mode.contains(Mode::WINDOWS) {
         if let Some((s, r)) = p.rsplit_once('.') {
             if WINDOWS_RESERVED.contains(&s) {
                 res.push(esc);
@@ -118,16 +173,14 @@ pub fn escape_str(mut p: &str, esc: char, mode: CharFlags) -> String {
                 res.push('.');
                 p = r;
             }
-        } else {
-            if WINDOWS_RESERVED.contains(&p) {
-                res.push(esc);
-                return res + p;
-            }
+        } else if WINDOWS_RESERVED.contains(&p) {
+            res.push(esc);
+            return res + p;
         }
     }
 
     if res.is_empty()
-        && mode.intersects(CharFlags::UNIX | CharFlags::MAC)
+        && mode.intersects(Mode::UNIX | Mode::MAC)
         && UNIX_RESERVED.contains(&p)
     {
         res.push(esc);
@@ -143,9 +196,9 @@ pub fn escape_str(mut p: &str, esc: char, mode: CharFlags) -> String {
         }
     }
 
-    if mode.intersects(CharFlags::WINDOWS) {
+    if mode.intersects(Mode::WINDOWS) {
         if let Some(c) = res.pop() {
-            if !allowed(c, CharFlags::WINDOWS_END) {
+            if !allowed(c, Mode::WINDOWS_END) {
                 res.push(esc);
                 res += &format!("{:02X}", c as u32);
             } else {
