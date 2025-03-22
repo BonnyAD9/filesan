@@ -14,10 +14,10 @@ info and examples see [documentation][doc].
 - **Documentation:** [docs.rs][doc]
 - **My Website:** [bonnyad9.github.io][my-web]
 
-[doc]: https://docs.rs/raplay/latest/filesan/
+[doc]: https://docs.rs/filesan/latest/filesan/
 [author]: https://github.com/BonnyAD9
 [github]: https://github.com/BonnyAD9/filesan
-[package]: https://crates.io/crates/raplay
+[package]: https://crates.io/crates/filesan
 [my-web]: https://bonnyad9.github.io/
 [version-badge]: https://img.shields.io/crates/v/filesan
 [downloads-badge]: https://img.shields.io/crates/d/filesan
