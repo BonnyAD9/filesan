@@ -7,6 +7,7 @@ bitflags! {
         const UNIX = 0x1;
         const WINDOWS = 0x2;
         const MAC = 0x4;
+        const ALL = 0x7;
         const WINDOWS_END = 0x8;
         #[cfg(unix)]
         const SYSTEM = Self::UNIX.bits();
