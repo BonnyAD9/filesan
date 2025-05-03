@@ -1,6 +1,10 @@
 # CHANGELOG
 
-## v0.1.1
+## future
+### Breaking changes
+- The escaping by `esc_str` is now different. It is still unique to the
+  previous implemntation.
+
 ### New features
 - Function `replace_escape` to escape strings by replacing some characters.
 
