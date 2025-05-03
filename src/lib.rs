@@ -36,6 +36,8 @@
 
 mod char_flags;
 
+use std::ops::Range;
+
 pub use self::char_flags::*;
 
 const NON: Mode = Mode::NONE;
@@ -167,13 +169,13 @@ pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
 
     if mode.contains(Mode::WINDOWS) {
         if let Some((s, r)) = p.rsplit_once('.') {
-            if WINDOWS_RESERVED.contains(&s) {
+            if windows_reserved_contains(s) {
                 res.push(esc);
                 res += s;
                 res.push('.');
                 p = r;
             }
-        } else if WINDOWS_RESERVED.contains(&p) {
+        } else if windows_reserved_contains(p) {
             res.push(esc);
             return res + p;
         }
@@ -208,4 +210,19 @@ pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
     }
 
     res
+}
+
+fn windows_reserved_contains(s: &str) -> bool {
+    match s.len() {
+        3 => {
+            let s = s.to_ascii_uppercase();
+            matches!(s.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        }
+        4 => {
+            let s = s.to_ascii_uppercase();
+            (s.starts_with("COM") || s.starts_with("LPT"))
+                && s[3..].chars().next().unwrap().is_ascii_digit()
+        }
+        _ => false
+    }
 }
