@@ -7,8 +7,9 @@
 //!
 //! Given a filename, escape the filename so that it is allowed by the OS.
 //!
-//! The main function of this crate is [`escape_str`] which will take string
-//! as input, and return modified version that can be used as filename:
+//! The main functions of this crate are [`escape_str`] and [`replace_escape`]
+//! which will take string as input, and return modified version that can be
+//! used as filename:
 //! ```
 //! use filesan::{escape_str, Mode};
 //!
@@ -32,7 +33,7 @@
 //! ```
 //!
 //! You can use [`Mode::SYSTEM`] to get your current target system. See
-//! documentation of [`escape_str`] for more info.
+//! documentation of [`escape_str`] and [`replace_escape`] for more info.
 
 mod char_flags;
 
@@ -187,7 +188,8 @@ pub fn escape_str(p: &str, esc: char, mode: Mode) -> String {
 /// the original.
 ///
 /// The escape character may be any character that you are sure that is valid
-/// in filename on the target OS. Good choice is for example the character `_`.
+/// in filename on the target OS. Other bad options are `.` and ` ` (space).
+/// Good choice is for example the character `_`.
 ///
 /// `mode` may be any combination of the following flags that combine features
 /// of disallowed filename features that will be escaped:
