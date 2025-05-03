@@ -1,12 +1,15 @@
 # CHANGELOG
 
 ## v0.1.1
+### New features
+- Function `replace_escape` to escape strings by replacing some characters.
 
 ### Changes
 - Optimize checking for windows reserved name.
 
 ### Fixes
 - Windows reserved names are now case insensitive.
+- Fix some edge cases.
 
 ## v0.1.0
 - Add reserved filenames with `WINDOWS_RESERVED` and `UNIX_RESERVED`. Platform

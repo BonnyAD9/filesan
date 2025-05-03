@@ -36,8 +36,6 @@
 
 mod char_flags;
 
-use std::ops::Range;
-
 pub use self::char_flags::*;
 
 const NON: Mode = Mode::NONE;
@@ -164,20 +162,117 @@ pub fn allowed(c: char, mode: Mode) -> bool {
 ///     "_00hello_2Fthe_5Fre.txt_3A."
 /// );
 /// ```
-pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
+pub fn escape_str(p: &str, esc: char, mode: Mode) -> String {
+    escape_str_inner(
+        p,
+        esc,
+        mode,
+        |res, chr| *res += &format!("{esc}{:02X}", chr as u32),
+        |res, s| {
+            res.push(esc);
+            let Some(c) = s.chars().next() else {
+                return;
+            };
+            *res += &format!("{:02X}", c as u32);
+            *res += &s[c.len_utf8()..];
+        },
+    )
+}
+
+/// Escape the given string so that it may be used as valid path on the given
+/// systems.
+///
+/// The new string will be formed by replacing some characters by the escape
+/// character. So the final strin will have the same amount of characters as
+/// the original.
+///
+/// The escape character may be any character that you are sure that is valid
+/// in filename on the target OS. Good choice is for example the character `_`.
+///
+/// `mode` may be any combination of the following flags that combine features
+/// of disallowed filename features that will be escaped:
+/// - [`Mode::UNIX`]:
+///     - disallowed characters: `\x00`, `/`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::WINDOWS`]:
+///     - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`,
+///       `|`, `?`, `*`
+///     - disallowed filenames (both with and without extension): `CON`, `PRN`,
+///       `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
+///     - disallowed characters at the end: ` `, `.`
+/// - [`Mode::MAC`]:
+///     - disallowed characters: `\x00`, `/`, `:`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::ALL`]: all of the above.
+/// - [`Mode::SYSTEM`]: flag of the current target system.
+/// - [`Mode::WINDOWS_END`]:
+///     - disallowed characters: ` `, `.`
+///
+/// # Returns
+/// String with escaped invalid paths. Escape character and invalid characters
+/// are replaced with escape character followed by two digit hex value of the
+/// character. Invalid filenames are prefixed with the escape character.
+///
+/// # Example
+/// ```
+/// use filesan::{replace_escape, Mode};
+///
+/// // Unix support
+/// assert_eq!(
+///     replace_escape("\x00hello/the_re.txt:.", '_', Mode::UNIX),
+///     "_hello_the_re.txt:."
+/// );
+///
+/// // Windows support
+/// assert_eq!(
+///     replace_escape("\x00hello/the_re.txt:.", '_', Mode::WINDOWS),
+///     "_hello_the_re.txt__"
+/// );
+///
+/// // MACOS support
+/// assert_eq!(
+///     replace_escape("\x00hello/the_re.txt:.", '_', Mode::MAC),
+///     "_hello_the_re.txt_."
+/// );
+/// ```
+pub fn replace_escape(p: &str, esc: char, mode: Mode) -> String {
+    escape_str_inner(
+        p,
+        esc,
+        mode,
+        |res, _| res.push(esc),
+        |res, mut s| {
+            while let Some(post) = s.strip_prefix(esc) {
+                s = post;
+                res.push(esc);
+            }
+            if !s.is_empty() {
+                res.push(esc);
+                *res += &s[1..];
+            }
+        },
+    )
+}
+
+fn escape_str_inner(
+    mut p: &str,
+    esc: char,
+    mode: Mode,
+    mut chr: impl FnMut(&mut String, char),
+    mut name: impl FnMut(&mut String, &str),
+) -> String {
     let mut res = String::new();
 
     if mode.contains(Mode::WINDOWS) {
         if let Some((s, r)) = p.rsplit_once('.') {
             if windows_reserved_contains(s) {
-                res.push(esc);
-                res += s;
+                name(&mut res, s);
                 res.push('.');
                 p = r;
             }
         } else if windows_reserved_contains(p) {
-            res.push(esc);
-            return res + p;
+            name(&mut res, p);
+            return res;
         }
     }
 
@@ -185,14 +280,13 @@ pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
         && mode.intersects(Mode::UNIX | Mode::MAC)
         && UNIX_RESERVED.contains(&p)
     {
-        res.push(esc);
-        return res + p;
+        name(&mut res, p);
+        p = "";
     }
 
     for c in p.chars() {
         if c == esc || !allowed(c, mode) {
-            res.push(esc);
-            res += &format!("{:02X}", c as u32);
+            chr(&mut res, c);
         } else {
             res.push(c);
         }
@@ -201,8 +295,7 @@ pub fn escape_str(mut p: &str, esc: char, mode: Mode) -> String {
     if mode.intersects(Mode::WINDOWS) {
         if let Some(c) = res.pop() {
             if !allowed(c, Mode::WINDOWS_END) {
-                res.push(esc);
-                res += &format!("{:02X}", c as u32);
+                chr(&mut res, c);
             } else {
                 res.push(c);
             }
@@ -223,6 +316,6 @@ fn windows_reserved_contains(s: &str) -> bool {
             (s.starts_with("COM") || s.starts_with("LPT"))
                 && s[3..].chars().next().unwrap().is_ascii_digit()
         }
-        _ => false
+        _ => false,
     }
 }
