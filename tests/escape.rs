@@ -55,6 +55,10 @@ fn replace() {
         replace_escape("\x00hello/the_re.txt:.", '_', Mode::MAC),
         "_hello_the_re.txt_."
     );
+    assert_eq!(
+        replace_escape("\x00hello/the_re.txt:.", '_', Mode::ALL),
+        "_hello_the_re.txt__"
+    );
 
     assert_eq!(replace_escape("..", '_', Mode::UNIX), "_.");
     assert_eq!(replace_escape("..", '_', Mode::WINDOWS), "._");
