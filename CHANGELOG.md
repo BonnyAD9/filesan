@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## future
+### Changes
+- Optimize by avoiding allocations.
+
 ## v0.2.0
 ### Breaking changes
 - The escaping by `esc_str` is now different. It is still unique to the

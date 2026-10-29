@@ -35,6 +35,8 @@
 //! You can use [`Mode::SYSTEM`] to get your current target system. See
 //! documentation of [`escape_str`] and [`replace_escape`] for more info.
 
+use std::fmt::Write;
+
 mod char_flags;
 
 pub use self::char_flags::*;
@@ -168,13 +170,13 @@ pub fn escape_str(p: &str, esc: char, mode: Mode) -> String {
         p,
         esc,
         mode,
-        |res, chr| *res += &format!("{esc}{:02X}", chr as u32),
+        |res, chr| _ = write!(res, "{esc}{:02X}", chr as u32),
         |res, s| {
             res.push(esc);
             let Some(c) = s.chars().next() else {
                 return;
             };
-            *res += &format!("{:02X}", c as u32);
+            _ = write!(res, "{:02X}", c as u32);
             *res += &s[c.len_utf8()..];
         },
     )
@@ -294,13 +296,13 @@ fn escape_str_inner(
         }
     }
 
-    if mode.intersects(Mode::WINDOWS) {
-        if let Some(c) = res.pop() {
-            if !allowed(c, Mode::WINDOWS_END) {
-                chr(&mut res, c);
-            } else {
-                res.push(c);
-            }
+    if mode.intersects(Mode::WINDOWS)
+        && let Some(c) = res.pop()
+    {
+        if !allowed(c, Mode::WINDOWS_END) {
+            chr(&mut res, c);
+        } else {
+            res.push(c);
         }
     }
 
@@ -309,14 +311,12 @@ fn escape_str_inner(
 
 fn windows_reserved_contains(s: &str) -> bool {
     match s.len() {
-        3 => {
-            let s = s.to_ascii_uppercase();
-            matches!(s.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        }
+        3 => ["CON", "PRN", "AUX", "NUL"]
+            .iter()
+            .any(|o| s.eq_ignore_ascii_case(o)),
         4 => {
-            let s = s.to_ascii_uppercase();
-            (s.starts_with("COM") || s.starts_with("LPT"))
-                && s[3..].chars().next().unwrap().is_ascii_digit()
+            let s = &s[..s.floor_char_boundary(3)];
+            s.eq_ignore_ascii_case("COM") || s.eq_ignore_ascii_case("LPT")
         }
         _ => false,
     }
