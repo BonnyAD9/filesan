@@ -11,4 +11,4 @@ keywords = ["sanitize-filename", "filename", "sanitize"]
 categories = ["encoding", "filesystem"]
 
 [dependencies]
-bitflags = "2.9.0"
+bitflags = "2.13.2"
