@@ -4,8 +4,26 @@
 
 Filename sanitizer.
 
-Given a filename, escape the filename so that it is allowed by OS. For more
-info and examples see [documentation][doc].
+Given a filename, uniquely escape the filename so that it is allowed by OS.
+
+Supported OS:
+- Windows
+- Linux (unix)
+- MAC
+
+Generally the best function to use is `sanitize` which works on all systems
+and guarantees unique outputs for unique inputs while staying human
+understandable:
+```rust
+use filesan::sanitize;
+
+assert_eq!(
+    sanitize("\x00hello/the_re.txt:."),
+    "_00hello_2Fthe_5Fre.txt_3A_2E"
+);
+```
+But this crate provides more options for escaping filenames. For more info and
+examples see [documentation][doc].
 
 ## Links
 - **Author:** [BonnyAD9][author]

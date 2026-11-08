@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## future
+### New features
+- New function `sanitize` that is robust and easy to use.
+
 ## v0.2.1
 ### Changes
 - Optimize by avoiding allocations.

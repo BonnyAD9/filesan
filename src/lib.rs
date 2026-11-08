@@ -1,13 +1,27 @@
 //! Filename sanitizer.
 //!
+//! Given a filename, uniquely escape the filename so that it is allowed by the
+//! OS.
+//!
 //! Supported OS:
 //! - Windows
 //! - Linux (unix)
 //! - MAC
+//! 
+//! The main function ofthis crate is [`sanitize`]. It escapes the string
+//! in a way that is supported by all supported platforms and guarantees that
+//! unique inputs will result in unique outpus:
+//! 
+//! ```
+//! use filesan::sanitize;
+//! 
+//! assert_eq!(
+//!     sanitize("\x00hello/the_re.txt:."),
+//!     "_00hello_2Fthe_5Fre.txt_3A_2E"
+//! );
+//! ```
 //!
-//! Given a filename, escape the filename so that it is allowed by the OS.
-//!
-//! The main functions of this crate are [`escape_str`] and [`replace_escape`]
+//! If you need more control, you can use [`escape_str`] or [`replace_escape`]
 //! which will take string as input, and return modified version that can be
 //! used as filename:
 //! ```
@@ -34,6 +48,10 @@
 //!
 //! You can use [`Mode::SYSTEM`] to get your current target system. See
 //! documentation of [`escape_str`] and [`replace_escape`] for more info.
+//! 
+//! Although this crate provides the capability of escaping filenames only for
+//! certain systems, it is recommended to always use the [`Mode::ALL`] so that
+//! the generated filenames are transferable to any system.
 
 use std::fmt::Write;
 
@@ -110,11 +128,45 @@ pub fn allowed(c: char, mode: Mode) -> bool {
     }
 }
 
+/// Sanitize the given string so that it may be used as valid path on any
+/// of the supported systems (Unix (Linux), Windows and MacOS).
+/// 
+/// This is the general function that you should use when you are unsure. If
+/// you want more control, see [`escape_str`] and [`replace_escape`].
+/// 
+/// It is guaranteed that unique inputs to this function will generate unique
+/// outputs, and the same inputs will generate the same outputs.
+/// 
+/// This is equivalent to calling `escape_str(p, '_', Mode::ALL)`:
+/// - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`, `|`,
+///   `?`, `*`
+/// - disallowed filenames (both with and without extension): `CON`, `PRN`,
+///   `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
+/// - disallowed characters at the end: ` `, `.`
+///
+/// # Returns
+/// String with escaped invalid paths. Escape character and invalid characters
+/// are replaced with escape character followed by two digit hex value of the
+/// character. Invalid filenames are prefixed with the escape character.
+/// 
+/// # Example
+/// ```
+/// use filesan::sanitize;
+/// 
+/// assert_eq!(
+///     sanitize("\x00hello/the_re.txt:."),
+///     "_00hello_2Fthe_5Fre.txt_3A_2E"
+/// );
+/// ```
+pub fn sanitize(p: impl AsRef<str>) -> String {
+    escape_str(p, '_', Mode::ALL)
+}
+
 /// Escape the given string so that it may be used as valid path on the given
 /// systems.
 ///
 /// It is guaranteed that unique inputs to this function will generate unique
-/// outputs.
+/// outputs, and the same inputs will generate the same outputs.
 ///
 /// The escape character may be any character that you are sure that is valid
 /// in filename on the target OS. Good choice is for example the character `_`.
@@ -165,7 +217,7 @@ pub fn allowed(c: char, mode: Mode) -> bool {
 ///     "_00hello_2Fthe_5Fre.txt_3A."
 /// );
 /// ```
-pub fn escape_str(p: &str, esc: char, mode: Mode) -> String {
+pub fn escape_str(p: impl AsRef<str>, esc: char, mode: Mode) -> String {
     escape_str_inner(
         p,
         esc,
@@ -259,13 +311,14 @@ pub fn replace_escape(p: &str, esc: char, mode: Mode) -> String {
 }
 
 fn escape_str_inner(
-    mut p: &str,
+    p: impl AsRef<str>,
     esc: char,
     mode: Mode,
     mut chr: impl FnMut(&mut String, char),
     mut name: impl FnMut(&mut String, &str),
 ) -> String {
     let mut res = String::new();
+    let mut p = p.as_ref();
 
     if mode.contains(Mode::WINDOWS) {
         if let Some((s, r)) = p.rsplit_once('.') {
