@@ -7,14 +7,14 @@
 //! - Windows
 //! - Linux (unix)
 //! - MAC
-//! 
+//!
 //! The main function ofthis crate is [`sanitize`]. It escapes the string
 //! in a way that is supported by all supported platforms and guarantees that
 //! unique inputs will result in unique outpus:
-//! 
+//!
 //! ```
 //! use filesan::sanitize;
-//! 
+//!
 //! assert_eq!(
 //!     sanitize("\x00hello/the_re.txt:."),
 //!     "_00hello_2Fthe_5Fre.txt_3A_2E"
@@ -48,7 +48,7 @@
 //!
 //! You can use [`Mode::SYSTEM`] to get your current target system. See
 //! documentation of [`escape_str`] and [`replace_escape`] for more info.
-//! 
+//!
 //! Although this crate provides the capability of escaping filenames only for
 //! certain systems, it is recommended to always use the [`Mode::ALL`] so that
 //! the generated filenames are transferable to any system.
@@ -130,13 +130,13 @@ pub fn allowed(c: char, mode: Mode) -> bool {
 
 /// Sanitize the given string so that it may be used as valid path on any
 /// of the supported systems (Unix (Linux), Windows and MacOS).
-/// 
+///
 /// This is the general function that you should use when you are unsure. If
 /// you want more control, see [`escape_str`] and [`replace_escape`].
-/// 
+///
 /// It is guaranteed that unique inputs to this function will generate unique
 /// outputs, and the same inputs will generate the same outputs.
-/// 
+///
 /// This is equivalent to calling `escape_str(p, '_', Mode::ALL)`:
 /// - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`, `|`,
 ///   `?`, `*`
@@ -148,11 +148,11 @@ pub fn allowed(c: char, mode: Mode) -> bool {
 /// String with escaped invalid paths. Escape character and invalid characters
 /// are replaced with escape character followed by two digit hex value of the
 /// character. Invalid filenames are prefixed with the escape character.
-/// 
+///
 /// # Example
 /// ```
 /// use filesan::sanitize;
-/// 
+///
 /// assert_eq!(
 ///     sanitize("\x00hello/the_re.txt:."),
 ///     "_00hello_2Fthe_5Fre.txt_3A_2E"
