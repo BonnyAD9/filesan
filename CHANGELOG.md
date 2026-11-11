@@ -3,6 +3,10 @@
 ## future
 ### New features
 - New function `sanitize` that is robust and easy to use.
+- New variants for all functions that append existing string.
+
+### Changes
+- Optimize allocation.
 
 ## v0.2.1
 ### Changes

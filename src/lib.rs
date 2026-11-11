@@ -21,6 +21,10 @@
 //! );
 //! ```
 //!
+//! For all of the functions in this crate there exists a variant that returns
+//! and variant that appends to allocated string ending with `_to` (e.g.
+//! [`sanitize_to`])
+//!
 //! If you need more control, you can use [`escape_str`] or [`replace_escape`]
 //! which will take string as input, and return modified version that can be
 //! used as filename:
@@ -131,6 +135,9 @@ pub fn allowed(c: char, mode: Mode) -> bool {
 /// Sanitize the given string so that it may be used as valid path on any
 /// of the supported systems (Unix (Linux), Windows and MacOS).
 ///
+/// If you want to append to already allocated string, use
+/// [`sanitize_to`].
+///
 /// This is the general function that you should use when you are unsure. If
 /// you want more control, see [`escape_str`] and [`replace_escape`].
 ///
@@ -162,8 +169,36 @@ pub fn sanitize(p: impl AsRef<str>) -> String {
     escape_str(p, '_', Mode::ALL)
 }
 
+/// Sanitize the given string so that it may be used as valid path on any
+/// of the supported systems (Unix (Linux), Windows and MacOS) and append it
+/// to the given string.
+///
+/// This is the general function that you should use when you are unsure. If
+/// you want more control, see [`escape_str`] and [`replace_escape`].
+///
+/// It is guaranteed that unique inputs to this function will generate unique
+/// outputs, and the same inputs will generate the same outputs.
+///
+/// This is equivalent to calling `escape_str(p, '_', Mode::ALL)`:
+/// - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`, `|`,
+///   `?`, `*`
+/// - disallowed filenames (both with and without extension): `CON`, `PRN`,
+///   `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
+/// - disallowed characters at the end: ` `, `.`
+///
+/// # Returns
+/// String with escaped invalid paths. Escape character and invalid characters
+/// are replaced with escape character followed by two digit hex value of the
+/// character. Invalid filenames are prefixed with the escape character.
+pub fn sanitize_to(p: impl AsRef<str>, out: &mut String) {
+    escape_str_to(p, '_', Mode::ALL, out)
+}
+
 /// Escape the given string so that it may be used as valid path on the given
 /// systems.
+///
+/// If you want to append to already allocated string, use
+/// [`escape_str_to`].
 ///
 /// It is guaranteed that unique inputs to this function will generate unique
 /// outputs, and the same inputs will generate the same outputs.
@@ -218,6 +253,49 @@ pub fn sanitize(p: impl AsRef<str>) -> String {
 /// );
 /// ```
 pub fn escape_str(p: impl AsRef<str>, esc: char, mode: Mode) -> String {
+    let mut res = String::new();
+    escape_str_to(p, esc, mode, &mut res);
+    res
+}
+
+/// Escape the given string so that it may be used as valid path on the given
+/// systems and append it to the given string.
+///
+/// It is guaranteed that unique inputs to this function will generate unique
+/// outputs, and the same inputs will generate the same outputs.
+///
+/// The escape character may be any character that you are sure that is valid
+/// in filename on the target OS. Good choice is for example the character `_`.
+///
+/// `mode` may be any combination of the following flags that combine features
+/// of disallowed filename features that will be escaped:
+/// - [`Mode::UNIX`]:
+///     - disallowed characters: `\x00`, `/`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::WINDOWS`]:
+///     - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`,
+///       `|`, `?`, `*`
+///     - disallowed filenames (both with and without extension): `CON`, `PRN`,
+///       `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
+///     - disallowed characters at the end: ` `, `.`
+/// - [`Mode::MAC`]:
+///     - disallowed characters: `\x00`, `/`, `:`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::ALL`]: all of the above.
+/// - [`Mode::SYSTEM`]: flag of the current target system.
+/// - [`Mode::WINDOWS_END`]:
+///     - disallowed characters: ` `, `.`
+///
+/// # Returns
+/// String with escaped invalid paths. Escape character and invalid characters
+/// are replaced with escape character followed by two digit hex value of the
+/// character. Invalid filenames are prefixed with the escape character.
+pub fn escape_str_to(
+    p: impl AsRef<str>,
+    esc: char,
+    mode: Mode,
+    out: &mut String,
+) {
     escape_str_inner(
         p,
         esc,
@@ -231,11 +309,15 @@ pub fn escape_str(p: impl AsRef<str>, esc: char, mode: Mode) -> String {
             _ = write!(res, "{:02X}", c as u32);
             *res += &s[c.len_utf8()..];
         },
-    )
+        out,
+    );
 }
 
 /// Escape the given string so that it may be used as valid path on the given
 /// systems.
+///
+/// If you want to append to already allocated string, use
+/// [`replace_escape_to`].
 ///
 /// The new string will be formed by replacing some characters by the escape
 /// character. So the final strin will have the same amount of characters as
@@ -292,6 +374,46 @@ pub fn escape_str(p: impl AsRef<str>, esc: char, mode: Mode) -> String {
 /// );
 /// ```
 pub fn replace_escape(p: &str, esc: char, mode: Mode) -> String {
+    let mut res = String::new();
+    replace_escape_to(p, esc, mode, &mut res);
+    res
+}
+
+/// Escape the given string so that it may be used as valid path on the given
+/// systems and append the result to the given string.
+///
+/// The new string will be formed by replacing some characters by the escape
+/// character. So the final strin will have the same amount of characters as
+/// the original.
+///
+/// The escape character may be any character that you are sure that is valid
+/// in filename on the target OS. Other bad options are `.` and ` ` (space).
+/// Good choice is for example the character `_`.
+///
+/// `mode` may be any combination of the following flags that combine features
+/// of disallowed filename features that will be escaped:
+/// - [`Mode::UNIX`]:
+///     - disallowed characters: `\x00`, `/`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::WINDOWS`]:
+///     - disallowed characters `0x00` - `0x31`, `<`, `>`, `:`, `"`, `/`, `\`,
+///       `|`, `?`, `*`
+///     - disallowed filenames (both with and without extension): `CON`, `PRN`,
+///       `AUX`, `NUL`, `COM1` - `COM9`, `LPT1` - `LPT9`
+///     - disallowed characters at the end: ` `, `.`
+/// - [`Mode::MAC`]:
+///     - disallowed characters: `\x00`, `/`, `:`
+///     - disallowed filenames: `.`, `..`
+/// - [`Mode::ALL`]: all of the above.
+/// - [`Mode::SYSTEM`]: flag of the current target system.
+/// - [`Mode::WINDOWS_END`]:
+///     - disallowed characters: ` `, `.`
+///
+/// # Returns
+/// String with escaped invalid paths. Escape character and invalid characters
+/// are replaced with escape character followed by two digit hex value of the
+/// character. Invalid filenames are prefixed with the escape character.
+pub fn replace_escape_to(p: &str, esc: char, mode: Mode, out: &mut String) {
     escape_str_inner(
         p,
         esc,
@@ -307,7 +429,8 @@ pub fn replace_escape(p: &str, esc: char, mode: Mode) -> String {
                 *res += &s[1..];
             }
         },
-    )
+        out,
+    );
 }
 
 fn escape_str_inner(
@@ -316,20 +439,21 @@ fn escape_str_inner(
     mode: Mode,
     mut chr: impl FnMut(&mut String, char),
     mut name: impl FnMut(&mut String, &str),
-) -> String {
-    let mut res = String::new();
+    res: &mut String,
+) {
     let mut p = p.as_ref();
+    res.reserve(p.len());
 
     if mode.contains(Mode::WINDOWS) {
         if let Some((s, r)) = p.rsplit_once('.') {
             if windows_reserved_contains(s) {
-                name(&mut res, s);
+                name(res, s);
                 res.push('.');
                 p = r;
             }
         } else if windows_reserved_contains(p) {
-            name(&mut res, p);
-            return res;
+            name(res, p);
+            return;
         }
     }
 
@@ -337,13 +461,13 @@ fn escape_str_inner(
         && mode.intersects(Mode::UNIX | Mode::MAC)
         && UNIX_RESERVED.contains(&p)
     {
-        name(&mut res, p);
+        name(res, p);
         p = "";
     }
 
     for c in p.chars() {
         if c == esc || !allowed(c, mode) {
-            chr(&mut res, c);
+            chr(res, c);
         } else {
             res.push(c);
         }
@@ -353,13 +477,11 @@ fn escape_str_inner(
         && let Some(c) = res.pop()
     {
         if !allowed(c, Mode::WINDOWS_END) {
-            chr(&mut res, c);
+            chr(res, c);
         } else {
             res.push(c);
         }
     }
-
-    res
 }
 
 fn windows_reserved_contains(s: &str) -> bool {
